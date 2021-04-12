@@ -1,5 +1,4 @@
 #include <algorithm>
-
 #include <pistache/net.h>
 #include <pistache/http.h>
 #include <pistache/peer.h>
@@ -8,29 +7,50 @@
 #include <pistache/router.h>
 #include <pistache/endpoint.h>
 #include <pistache/common.h>
-
+#include <ctime>
 #include <signal.h>
 #include <vector>
 
 using namespace std;
+using namespace Pistache;
 
 struct SmartWatch {
     int sleepHours;
     int sleepQuality;
     int heartRate;
     string wakeUpHour;
-
 };
+
 struct Ingredients {
     int sugarLvl;
-//    int coffeeLvl;
+    int coffeeLvl;
     int waterLvl;
     int milkLvl;
 };
 
+class Coffee {
+    public:
+        int milkNeeded;
+        int waterNeeded;
+        int sugarNeeded;
+        int coffeeNeeded;
+        string name;
+        Coffee(string n, int c, int m, int w, int s) {
+            milkNeeded = m;
+            waterNeeded = w;
+            sugarNeeded = s;
+            name = n;
+            coffeeNeeded = c;
+        }
+};
 
-using namespace std;
-using namespace Pistache;
+vector<Coffee> coffees;
+
+namespace Generic {
+    void handleReady(const Rest::Request&, Http::ResponseWriter response) {
+        response.send(Http::Code::Ok, "Server is running");
+    }
+}
 
 class CoffeeMakerEndpoint {
 public:
@@ -42,6 +62,7 @@ public:
         auto opts = Http::Endpoint::options()
                 .threads(static_cast<int>(thr));
         httpEndpoint->init(opts);
+
         setupRoutes();
     }
 
@@ -56,29 +77,18 @@ public:
         httpEndpoint->shutdown();
     }
 
-    std::shared_ptr<Http::Endpoint> httpEndpoint;
-    Rest::Router router;
 private:
-
     void setupRoutes() {
         using namespace Rest;
-        Routes::Get(router, "/cancel", Routes::bind(&CoffeeMakerEndpoint::cancelPreparation, this));
-        Routes::Get(router, "/showStage", Routes::bind(&CoffeeMakerEndpoint::showStage, this));
-        Routes::Get(router, "/alert", Routes::bind(&CoffeeMakerEndpoint::showAlert, this));
-        Routes::Get(router, "/history", Routes::bind(&CoffeeMakerEndpoint::showHistory, this));
-        Routes::Get(router, "/chooseCoffee", Routes::bind(&CoffeeMakerEndpoint::chooseCoffee, this));
-        Routes::Get(router, "/recommendations", Routes::bind(&CoffeeMakerEndpoint::showRecommendations, this));
+        Routes::Get(router, "/ready", Routes::bind(&Generic::handleReady));
         Routes::Post(router, "/settings/:settingName/:value", Routes::bind(&CoffeeMakerEndpoint::setSetting, this));
         Routes::Get(router, "/settings/:settingName/", Routes::bind(&CoffeeMakerEndpoint::getSetting, this));
-
     }
 
     void setSetting(const Rest::Request &request, Http::ResponseWriter response) {
-
         auto settingName = request.param(":settingName").as<std::string>();
 
         Guard guard(coffeeLock);
-
 
         string val = "";
         if (request.hasParam(":value")) {
@@ -88,13 +98,32 @@ private:
 
         int setResponse = cmk.set(settingName, val);
 
-        if (setResponse == 1) {
-            response.send(Http::Code::Ok, settingName + " was set to " + val);
-        } else {
-            response.send(Http::Code::Not_Found,
-                          settingName + " was not found and or '" + val + "' was not a valid value ");
+        // Send notifications if there aren't enough ingredients
+        if (settingName.compare("chooseCoffee") == 0) {
+            if (setResponse == 1){
+                response.send(Http::Code::Ok, "Coffee is preparing");
+            }
+            else if (setResponse == -1) {
+                response.send(Http::Code::Not_Found, "There isn't enough coffee");
+            }
+            else if (setResponse == -2) {
+                response.send(Http::Code::Not_Found, "There isn't enough milk");
+            }
+            else if (setResponse == -3) {
+                response.send(Http::Code::Not_Found, "There isn't enough sugar");
+            }
+            else if (setResponse == -4) {
+                response.send(Http::Code::Not_Found, "There isn't enough water");
+            }
         }
-
+        else {
+            if (setResponse == 1) {
+                response.send(Http::Code::Ok, settingName + " was set to " + val);
+            } else {
+                response.send(Http::Code::Not_Found,
+                            settingName + " was not found and or '" + val + "' was not a valid value ");
+            }
+        }
     }
 
     void getSetting(const Rest::Request &request, Http::ResponseWriter response) {
@@ -105,7 +134,6 @@ private:
         string valueSetting = cmk.get(settingName);
 
         if (valueSetting != "") {
-
             using namespace Http;
             response.headers()
                     .add<Header::Server>("pistache/0.1")
@@ -117,112 +145,135 @@ private:
         }
     }
 
-    void cancelPreparation(const Rest::Request &request, Http::ResponseWriter response) {
-        response.send(Http::Code::Ok, "am ajuns la destinatie");
-
-    }
-
-    int showStage(const Rest::Request &request, Http::ResponseWriter response) {
-        return 0;
-
-    }
-
-    int showAlert(const Rest::Request &request, Http::ResponseWriter response) {
-        return 0;
-
-    }
-
-    int showHistory(const Rest::Request &request, Http::ResponseWriter response) {
-        return 0;
-
-    }
-
-    int chooseCoffee(const Rest::Request &request, Http::ResponseWriter response) {
-        return 0;
-
-    }
-
-    int showRecommendations(const Rest::Request &request, Http::ResponseWriter response) {
-        return 0;
-
-    }
-
     class CoffeeMaker {
     private:
         bool cancelPrep;
         string showStage;
         SmartWatch smartData;
         vector<string> coffeeRecommendations;
-        bool alert;
         Ingredients ingredients;
-        vector<string> history;
+        vector<pair<string, string>> history;
         string chooseCoffee;
-
     public:
-        explicit CoffeeMaker() {};
+        explicit CoffeeMaker() {
+            cancelPrep = false;
+            showStage = "none";
+            chooseCoffee = "none";
+
+            //Initial ingredients level from the coffee maker
+            ingredients.coffeeLvl = 10;
+            ingredients.milkLvl = 10;
+            ingredients.sugarLvl = 10;
+            ingredients.waterLvl = 10;
+        };
+
+        // Verify the level of ingredients and substract the necessary ingredients for the coffee
+        int verifyIngredientsLevel(string coffeeName) {
+            for (auto c : coffees) {
+                if (c.name.compare(coffeeName) == 0) {
+                    if (ingredients.coffeeLvl - c.coffeeNeeded < 0){
+                        return -1;
+                    }
+                    else if (ingredients.milkLvl - c.milkNeeded < 0) {
+                        return -2;
+                    }
+                    else if (ingredients.sugarLvl - c.sugarNeeded < 0) {
+                        return -3;
+                    }
+                    else if (ingredients.waterLvl - c.waterNeeded < 0){
+                        return -4;
+                    }
+                    else {
+                        ingredients.coffeeLvl -= c.coffeeNeeded;
+                        ingredients.milkLvl -= c.milkNeeded;
+                        ingredients.sugarLvl -= c.sugarNeeded;
+                        ingredients.waterLvl -= c.waterNeeded;
+                        return 1;
+                    }
+                }
+            }
+            return 0;
+        }
 
         int set(string name, string value) {
-            if (name == "cancel") {
+            if (name.compare("cancel") == 0){
                 cancelPrep = true;
                 return 1;
-            } else if (name == "showStage") {
+            }
+            if (name.compare("showStage") == 0) {
                 showStage = value;
                 return 1;
-
-            } else if (name == "history") {
-                history.push_back(value);
-                return 1;
             }
-//            else if(name == " "){
-////                recomandation method setRecom
-//            }
+            if (name.compare("chooseCoffee") == 0){
+                chooseCoffee = value;
+                time_t now = time(0);
+                // If there are enough ingredients, we prepare the coffee and append it to history
+                if(verifyIngredientsLevel(value) == 1) {
+                    history.push_back(make_pair(value, ctime(&now)));
+                    return 1;
+                }
+                else {
+                    return verifyIngredientsLevel(value);
+                };
+            }
             return 0;
-
         }
 
         string get(string name) {
-            if (name == "cancel") {
+            if (name.compare("cancel") == 0) {
                 return to_string(cancelPrep);
             }
-            if (name == "showStage") {
+            if (name.compare("showStage") == 0) {
                 return showStage;
             }
-            if (name == "history") {
+            if (name.compare("history") == 0) {
+                // Show the history for the coffees
                 string s = "";
                 for (auto i: history) {
-                    s.append(i + ", ");
+                    s.append(i.first + ", " + i.second + "\n");
                 }
                 return s;
             }
-            if (name == "chooseCoffee") {
+            if (name.compare("chooseCoffee") == 0) {
                 return chooseCoffee;
             }
-            if (name == "alert") {
-                return to_string(alert);
-            }
-            if (name == "recommendations") {
+            if(name.compare("recommendations") == 0) {
                 string s = "";
                 for (auto i: coffeeRecommendations) {
-                    s.append(i + ", ");
+                    s.append(i + "\n");
                 }
                 return s;
-            }using Lock = std::mutex;
-            using Guard = std::lock_guard<Lock>;
-            Lock coffeeLock;
-            CoffeeMaker cmk;
-
+            }
+            if(name.compare("ingredients") == 0) {
+                string s = "";
+                s.append("Coffee level: " + to_string(ingredients.coffeeLvl) + "\n");
+                s.append("Water level: " + to_string(ingredients.waterLvl) + "\n");
+                s.append("Sugar level: " + to_string(ingredients.sugarLvl) + "\n");
+                s.append("Milk level: " + to_string(ingredients.milkLvl) + "\n");
+                return s;
+            }
+            return "";
         }
-
     };
 
     using Lock = std::mutex;
     using Guard = std::lock_guard<Lock>;
     Lock coffeeLock;
+
     CoffeeMaker cmk;
 
+    std::shared_ptr<Http::Endpoint> httpEndpoint;
+    Rest::Router router;
 };
 
 int main(int argc, char *argv[]) {
+    // Scale from 1 to 5
+    // Coffees available in the coffee maker
+    coffees.push_back(Coffee("Espresso", 3, 0, 1, 0));
+    coffees.push_back(Coffee("Latte", 3, 3, 2, 2));
+    coffees.push_back(Coffee("Cappuccino", 3, 2, 1, 0));
+    coffees.push_back(Coffee("Americano", 3, 0, 3, 1));
+    coffees.push_back(Coffee("FlatWhite", 3, 1, 1, 1));
 
     // This code is needed for gracefull shutdown of the server when no longer needed.
     sigset_t signals;
@@ -259,7 +310,6 @@ int main(int argc, char *argv[]) {
     // Initialize and start the server
     stats.init(thr);
     stats.start();
-
 
     // Code that waits for the shutdown sinal for the server
     int signal = 0;
