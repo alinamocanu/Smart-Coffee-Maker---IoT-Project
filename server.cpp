@@ -10,6 +10,7 @@
 #include <ctime>
 #include <signal.h>
 #include <vector>
+#include <stdio.h>
 
 using namespace std;
 using namespace Pistache;
@@ -44,12 +45,28 @@ class Coffee {
         }
 };
 
+
 vector<Coffee> coffees;
 
 namespace Generic {
+
     void handleReady(const Rest::Request&, Http::ResponseWriter response) {
-        response.send(Http::Code::Ok, "Server is running");
+        response.send(Http::Code::Ok, "1");
     }
+
+}
+
+// function used to parse a string 
+std::vector<std::string> split(const std::string& s, char delimiter)
+{
+   std::vector<std::string> tokens;
+   std::string token;
+   std::istringstream tokenStream(s);
+   while (std::getline(tokenStream, token, delimiter))
+   {
+      tokens.push_back(token);
+   }
+   return tokens;
 }
 
 class CoffeeMakerEndpoint {
@@ -85,6 +102,7 @@ private:
         Routes::Get(router, "/settings/:settingName/", Routes::bind(&CoffeeMakerEndpoint::getSetting, this));
     }
 
+    
     void setSetting(const Rest::Request &request, Http::ResponseWriter response) {
         auto settingName = request.param(":settingName").as<std::string>();
 
@@ -114,6 +132,15 @@ private:
             }
             else if (setResponse == -4) {
                 response.send(Http::Code::Not_Found, "There isn't enough water");
+            }
+        } else if (settingName.compare("cancel") == 0) {
+            if (setResponse == 1) {
+                response.send(Http::Code::Not_Found, "Cancel Preparation");
+            }
+
+        } else if (settingName.compare("showStage") == 0) {
+            if (setResponse == 1) {
+                response.send(Http::Code::Not_Found, "Stage : " + cmk.coffeeStage(cmk.getStage()));
             }
         }
         else {
@@ -148,7 +175,7 @@ private:
     class CoffeeMaker {
     private:
         bool cancelPrep;
-        string showStage;
+        int showStage;
         SmartWatch smartData;
         vector<string> coffeeRecommendations;
         Ingredients ingredients;
@@ -157,7 +184,7 @@ private:
     public:
         explicit CoffeeMaker() {
             cancelPrep = false;
-            showStage = "none";
+            showStage = 0;
             chooseCoffee = "none";
 
             //Initial ingredients level from the coffee maker
@@ -166,6 +193,27 @@ private:
             ingredients.sugarLvl = 10;
             ingredients.waterLvl = 10;
         };
+
+        static string coffeeStage(int p) {
+              switch(p) {
+                    case 0:
+                        return "Idle";
+                    case 1:
+                        return "Preparing Your Ingredients";
+                    case 2:
+                         return "Your coffee is in the making!";
+                    case 3:
+                         return "Your coffee is ready";
+                    case 4:
+                         return "Coffee canceled";
+                    default:
+                        return "Oopsie! Unkown stage :(";
+              }
+        }
+
+        int  getStage() {
+            return showStage;
+        }
 
         // Verify the level of ingredients and substract the necessary ingredients for the coffee
         int verifyIngredientsLevel(string coffeeName) {
@@ -201,15 +249,17 @@ private:
                 return 1;
             }
             if (name.compare("showStage") == 0) {
-                showStage = value;
+                showStage = 4;
                 return 1;
             }
             if (name.compare("chooseCoffee") == 0){
                 chooseCoffee = value;
+                showStage = 1;
                 time_t now = time(0);
                 // If there are enough ingredients, we prepare the coffee and append it to history
                 if(verifyIngredientsLevel(value) == 1) {
                     history.push_back(make_pair(value, ctime(&now)));
+                    showStage = 2;
                     return 1;
                 }
                 else {
@@ -224,7 +274,7 @@ private:
                 return to_string(cancelPrep);
             }
             if (name.compare("showStage") == 0) {
-                return showStage;
+                return coffeeStage(getStage());
             }
             if (name.compare("history") == 0) {
                 // Show the history for the coffees
