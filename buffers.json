@@ -1,0 +1,121 @@
+{
+    "device-name": "Smart Coffee Maker App",
+    "device-type": "Coffee Maker",
+    "buffers-count": 2,
+    "input-buffers":{
+        "1":{
+            "token-delimitators": "",
+            "protocol": "HTTP",
+            "prefix": "curl -XPOST 'http://127.0.0.1:9080/'",
+            "buffer-tokens":[
+            {
+                "name":"Coffee Maker POST options",
+                "description":"Options available for the user",
+                "token-type":"string", 
+                "byte-size":10, 
+                "regex-rule": "[a-zA-Z]*", // Correct inputs will be: [settings]
+                "optional": false
+            },
+            {
+                "name":"Coffee Maker option parameter key",
+                "description": "Parameter key for the setting chosen",
+                "token-type":"string",
+                "byte-size":10,
+                "regex-rule": "[a-zA-Z]*", // Correct inputs will be: [chooseCoffee, cancel]
+                "optional": false
+            },
+            {
+                "name":"Coffee Maker option parameter value",
+                "description": "Parameter value for the setting chosen",
+                "token-type":"string",
+                "byte-size":10,
+                "regex-rule": "[a-zA-Z]*", // Correct inputs will be: [Espresso, Latte, Cappuccino, Americano, FlatWhite, true, false]
+                "optional": false
+            }
+            ]
+        },
+		"2": {
+            "token-delimitators": "",
+            "protocol": "HTTP",
+            "prefix": "curl -XPOST 'http://127.0.0.1:9080/'",
+            "buffer-tokens":[
+            {
+                "name":"Ask for recommendations",
+                "description":"",
+                "token-type":"string", 
+                "byte-size":10, 
+                "regex-rule": "[a-zA-Z]*", // Correct inputs will be: [settings]
+                "optional": false
+            },
+            {
+                "name":"Coffee Maker option parameter key",
+                "description": "Parameter key for the recommendations option",
+                "token-type":"string",
+                "byte-size":10,
+                "regex-rule": "[a-zA-Z]*", // Correct input will be: [recommendations]
+                "optional": false
+            },
+            {
+                "name":"Coffee Maker Smartwatch values",
+                "description": "Parameter values got from user's Smartwatch",
+                "token-type":"string",
+                "byte-size":10,
+                "regex-rule": "[1-9]|1[0-9]|2[0-4],
+						[1-9][0-9]?|100,
+						[6-9][0-9]|1[0-2][0-9],
+						[1-9]|1[0-9]|2[0-4]"
+						// Correct input will be: [4 values got from Smartwatch: sleep hours, sleep quality, heart rate and wake-up hour]
+                "optional": false
+            }
+            ]
+        }
+    },
+    "output-buffers":{
+        "1":{
+            "token-delimitators": "",
+            "protocol": "HTTP",
+            "prefix": "curl -XGET 'http://127.0.0.1:9080/'",
+            "buffer-tokens":[
+            {
+                "name":"Cofee Maker GET options",
+                "description":"",
+                "token-type":"string", 
+                "byte-size":10, 
+                "regex-rule": "[a-zA-Z]*", // Correct inputs will be: [ready, settings]
+                "optional": false
+            },
+            {
+                "name":"Cofee Maker options parameter",
+                "description": "Parameters for the setting chosen",
+                "token-type":"string",
+                "byte-size":10,
+                "regex-rule": "[a-zA-Z]*", // Correct inputs will be: [cancel, showStage, chooseCoffee, history]
+                "optional": true
+            }
+            ]
+        },
+		"2":{
+            "token-delimitators": "",
+            "protocol": "HTTP",
+            "prefix": "curl -XGET 'http://127.0.0.1:9080/'",
+            "buffer-tokens":[
+            {
+                "name":"Cofee Maker options",
+                "description":"",
+                "token-type":"string", 
+                "byte-size":10, 
+                "regex-rule": "[a-zA-Z]*", // Correct inputs will be: [settings]
+                "optional": false
+            },
+            {
+                "name":"Cofee Maker recommendations result",
+                "description": "Parameters for show the recommendations",
+                "token-type":"string",
+                "byte-size":10,
+                "regex-rule": "[a-zA-Z]*", // Correct inputs will be: [recommendations]
+                "optional": false
+            }
+            ]
+        }
+    }
+}
