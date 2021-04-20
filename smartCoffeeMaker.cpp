@@ -11,6 +11,9 @@
 #include <signal.h>
 #include <vector>
 #include <stdio.h>
+#include <chrono>
+#include <thread>
+
 
 using namespace std;
 using namespace Pistache;
@@ -49,20 +52,31 @@ public:
 
 vector<Coffee> coffees;
 
+// This is just a helper function to preety-print the Cookies that one of the enpoints shall receive.
+void printCookies(const Http::Request& req) {
+    auto cookies = req.cookies();
+    std::cout << "Cookies: [" << std::endl;
+    const std::string indent(4, ' ');
+    for (const auto& c: cookies) {
+        std::cout << indent << c.name << " = " << c.value << std::endl;
+    }
+    std::cout << "]" << std::endl;
+}
+
 namespace Generic {
 
     void handleReady(const Rest::Request &, Http::ResponseWriter response) {
-        response.send(Http::Code::Ok, "1");
+        response.send(Http::Code::Ok, "The Coffee Maker is functional!");
     }
 
 }
 
 // function used to parse a string 
-std::vector<std::string> split(const std::string &s, char delimiter) {
-    std::vector<std::string> tokens;
-    std::string token;
-    std::istringstream tokenStream(s);
-    while (std::getline(tokenStream, token, delimiter)) {
+vector<string> split(const string &s, char delimiter) {
+    vector<string> tokens;
+    string token;
+    istringstream tokenStream(s);
+    while (getline(tokenStream, token, delimiter)) {
         tokens.push_back(token);
     }
     return tokens;
@@ -86,21 +100,40 @@ public:
     void start() {
         httpEndpoint->setHandler(router.handler());
         httpEndpoint->serveThreaded();
+
+        checkLoopThread = new thread(&CoffeeMaker::checkData, ref(cmk));
+        //checkLoopThread->join();
     }
 
     // When signaled server shuts down
     void stop() {
         httpEndpoint->shutdown();
+
+        cmk.runThread = false;
+
+        checkLoopThread->join();
     }
 
 private:
+    thread *checkLoopThread;
+
     void setupRoutes() {
         using namespace Rest;
         Routes::Get(router, "/ready", Routes::bind(&Generic::handleReady));
+        Routes::Get(router, "/auth", Routes::bind(&CoffeeMakerEndpoint::doAuth, this));
         Routes::Post(router, "/settings/:settingName/:value", Routes::bind(&CoffeeMakerEndpoint::setSetting, this));
         Routes::Get(router, "/settings/:settingName/", Routes::bind(&CoffeeMakerEndpoint::getSetting, this));
     }
 
+    void doAuth(const Rest::Request& request, Http::ResponseWriter response) {  
+        // Function that prints cookies
+        printCookies(request);
+        // In the response object, it adds a cookie regarding the communications language.
+        response.cookies()
+            .add(Http::Cookie("lang", "en-US"));
+        // Send the response
+        response.send(Http::Code::Ok);
+    }
 
     void setSetting(const Rest::Request &request, Http::ResponseWriter response) {
         auto settingName = request.param(":settingName").as<std::string>();
@@ -139,7 +172,7 @@ private:
             }
         } else if(settingName.compare("recommendations")){
             if(setResponse == 1){
-            response.send(Http::Code::Ok, "Recommendations processing" );
+                response.send(Http::Code::Ok, "Recommendations processing" );
             }
         }
             else {
@@ -175,13 +208,17 @@ private:
     private:
         bool cancelPrep;
         int showStage;
-        SmartWatch smartData;
+        SmartWatch sm;
         vector<string> coffeeRecommendations;
         Ingredients ingredients;
         vector<pair<string, string>> history;
         string chooseCoffee;
     public:
+        bool runThread = true;
+        bool recommendationsMade = false;
+
         explicit CoffeeMaker() {
+            cout<<"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
             cancelPrep = false;
             showStage = 0;
             chooseCoffee = "none";
@@ -191,6 +228,11 @@ private:
             ingredients.milkLvl = 10;
             ingredients.sugarLvl = 10;
             ingredients.waterLvl = 10;
+
+            sm.heartRate = -1;
+            sm.sleepHours = -1;
+            sm.sleepQuality = -1;
+            sm.wakeUpHour = -1;
         };
 
         static string coffeeStage(int p) {
@@ -238,41 +280,44 @@ private:
             return 0;
         }
 
-        void makeRecommendations(vector<string> smartWatchVal) {
-
-//        sleepHours sleepQuality heartRate wakeUpHour;
-            SmartWatch sm;
-//            score can be from 0 to 10
-            double score;
-            coffeeRecommendations.clear();
+        void modifySMData(vector<string> smartWatchVal){
             sm.sleepHours = stoi(smartWatchVal[0]);
             sm.sleepQuality = stoi(smartWatchVal[1]);
             sm.heartRate = stoi(smartWatchVal[2]);
             sm.wakeUpHour = stoi(smartWatchVal[3]);
+        }
+
+        void makeRecommendations() {
+//        sleepHours sleepQuality heartRate wakeUpHour;
+//        score can be from 0 to 10
+            double score;
+            //coffeeRecommendations.clear();
+            // sm.sleepHours = stoi(smartWatchVal[0]);
+            // sm.sleepQuality = stoi(smartWatchVal[1]);
+            // sm.heartRate = stoi(smartWatchVal[2]);
+            // sm.wakeUpHour = stoi(smartWatchVal[3]);
 
             score = (sm.sleepHours * 7 + sm.sleepQuality * 3) / 10;
 
-                if (score < 20) {
-                    if (sm.heartRate > 100) {
-                        coffeeRecommendations.push_back(coffees[7].name);
-                        coffeeRecommendations.push_back(coffees[0].name);
-                        coffeeRecommendations.push_back(coffees[1].name);
-                    } else {
-                        coffeeRecommendations.push_back(coffees[6].name);
-                        coffeeRecommendations.push_back(coffees[7].name);
-                        coffeeRecommendations.push_back(coffees[8].name);
-                    }
-                } else if (score < 35) {
-                    coffeeRecommendations.push_back(coffees[3].name);
-                    coffeeRecommendations.push_back(coffees[4].name);
-                    coffeeRecommendations.push_back(coffees[5].name);
-                } else {
+            if (score < 20) {
+                if (sm.heartRate > 100) {
+                    coffeeRecommendations.push_back(coffees[7].name);
                     coffeeRecommendations.push_back(coffees[0].name);
                     coffeeRecommendations.push_back(coffees[1].name);
-                    coffeeRecommendations.push_back(coffees[2].name);
+                } else {
+                    coffeeRecommendations.push_back(coffees[6].name);
+                    coffeeRecommendations.push_back(coffees[7].name);
+                    coffeeRecommendations.push_back(coffees[8].name);
                 }
-
-
+            } else if (score < 35) {
+                coffeeRecommendations.push_back(coffees[3].name);
+                coffeeRecommendations.push_back(coffees[4].name);
+                coffeeRecommendations.push_back(coffees[5].name);
+            } else {
+                coffeeRecommendations.push_back(coffees[0].name);
+                coffeeRecommendations.push_back(coffees[1].name);
+                coffeeRecommendations.push_back(coffees[2].name);
+            }
         }
 
         int set(string name, string value) {
@@ -302,9 +347,9 @@ private:
                 if (smartWatchVal.size() != 4) {
                     return 0;
                 }
-                makeRecommendations(smartWatchVal);
+                //makeRecommendations(smartWatchVal);
+                modifySMData(smartWatchVal);
                 return 1;
-
             }
 
             return 0;
@@ -343,8 +388,35 @@ private:
                 s.append("Milk level: " + to_string(ingredients.milkLvl) + "\n");
                 return s;
             }
+            if (name.compare("smartwatch") == 0){
+                string s = "";
+                s.append("Number of hours slept " + to_string(sm.sleepHours) + "\n");
+                s.append("Sleep quality: " + to_string(sm.sleepQuality) + "\n");
+                s.append("Heart rate: " + to_string(sm.heartRate) + "\n");
+                s.append("Wake up hour: " + to_string(sm.wakeUpHour) + "\n");
+            }
 
             return "";
+        }
+
+        void checkData() {
+            while (runThread) {
+                this_thread::sleep_for(chrono::seconds(1));
+                cout<<"AAAAAAAAA";
+                time_t tt;
+                time(&tt);
+                tm TM = *localtime(&tt);
+                float currentHour = TM.tm_hour;
+                // if (sm.heartRate != -1 && sm.sleepHours != -1 && sm.sleepQuality != -1 && sm.wakeUpHour != -1) {
+                //     if (sm.sleepHours >= 3 && currentHour - sm.wakeUpHour == 0 && recommendationsMade == false){
+                //         recommendationsMade = true;
+                         makeRecommendations();
+                //     }
+                //     else if (currentHour - sm.wakeUpHour > 0 ){
+                //         recommendationsMade = false;
+                //     }
+                // }
+            }
         }
     };
 
