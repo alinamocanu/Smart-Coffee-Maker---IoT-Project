@@ -43,5 +43,5 @@ For post methods:
 ```bash
 curl -X -POST [URL]
 ```
-Or you can use a tool like [Postman] (https://www.postman.com/)
+Or you can use a tool like [Postman](https://www.postman.com/)
 Functionalities and analysis report - [Raport de analiza](https://github.com/AlinaMocanu/Smart-Coffee-Maker---IoT-Project/blob/main/Raport%20de%20analiza.docx)
