@@ -53,14 +53,14 @@ public:
 vector<Coffee> coffees;
 
 // This is just a helper function to preety-print the Cookies that one of the enpoints shall receive.
-void printCookies(const Http::Request& req) {
+void printCookies(const Http::Request &req) {
     auto cookies = req.cookies();
-    std::cout << "Cookies: [" << std::endl;
-    const std::string indent(4, ' ');
-    for (const auto& c: cookies) {
-        std::cout << indent << c.name << " = " << c.value << std::endl;
+    cout << "Cookies: [" << std::endl;
+    const string indent(4, ' ');
+    for (const auto &c: cookies) {
+        cout << indent << c.name << " = " << c.value << endl;
     }
-    std::cout << "]" << std::endl;
+    cout << "]" << std::endl;
 }
 
 namespace Generic {
@@ -102,7 +102,6 @@ public:
         httpEndpoint->serveThreaded();
 
         checkLoopThread = new thread(&CoffeeMaker::checkData, ref(cmk));
-        //checkLoopThread->join();
     }
 
     // When signaled server shuts down
@@ -125,12 +124,12 @@ private:
         Routes::Get(router, "/settings/:settingName/", Routes::bind(&CoffeeMakerEndpoint::getSetting, this));
     }
 
-    void doAuth(const Rest::Request& request, Http::ResponseWriter response) {  
+    void doAuth(const Rest::Request &request, Http::ResponseWriter response) {
         // Function that prints cookies
         printCookies(request);
         // In the response object, it adds a cookie regarding the communications language.
         response.cookies()
-            .add(Http::Cookie("lang", "en-US"));
+                .add(Http::Cookie("lang", "en-US"));
         // Send the response
         response.send(Http::Code::Ok);
     }
@@ -170,12 +169,11 @@ private:
             if (setResponse == 1) {
                 response.send(Http::Code::Ok, "Stage : " + cmk.coffeeStage(cmk.getStage()));
             }
-        } else if(settingName.compare("recommendations")){
-            if(setResponse == 1){
-                response.send(Http::Code::Ok, "Recommendations processing" );
+        } else if (settingName.compare("recommendations")) {
+            if (setResponse == 1) {
+                response.send(Http::Code::Ok, "Recommendations processing");
             }
-        }
-            else {
+        } else {
             if (setResponse == 1) {
                 response.send(Http::Code::Ok, settingName + " was set to " + val);
             } else {
@@ -218,7 +216,6 @@ private:
         bool recommendationsMade = false;
 
         explicit CoffeeMaker() {
-            cout<<"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
             cancelPrep = false;
             showStage = 0;
             chooseCoffee = "none";
@@ -280,7 +277,7 @@ private:
             return 0;
         }
 
-        void modifySMData(vector<string> smartWatchVal){
+        void modifySMData(vector<string> smartWatchVal) {
             sm.sleepHours = stoi(smartWatchVal[0]);
             sm.sleepQuality = stoi(smartWatchVal[1]);
             sm.heartRate = stoi(smartWatchVal[2]);
@@ -288,15 +285,8 @@ private:
         }
 
         void makeRecommendations() {
-//        sleepHours sleepQuality heartRate wakeUpHour;
-//        score can be from 0 to 10
             double score;
-            //coffeeRecommendations.clear();
-            // sm.sleepHours = stoi(smartWatchVal[0]);
-            // sm.sleepQuality = stoi(smartWatchVal[1]);
-            // sm.heartRate = stoi(smartWatchVal[2]);
-            // sm.wakeUpHour = stoi(smartWatchVal[3]);
-
+            coffeeRecommendations.clear();
             score = (sm.sleepHours * 7 + sm.sleepQuality * 3) / 10;
 
             if (score < 20) {
@@ -388,12 +378,13 @@ private:
                 s.append("Milk level: " + to_string(ingredients.milkLvl) + "\n");
                 return s;
             }
-            if (name.compare("smartwatch") == 0){
+            if (name.compare("smartwatch") == 0) {
                 string s = "";
                 s.append("Number of hours slept " + to_string(sm.sleepHours) + "\n");
                 s.append("Sleep quality: " + to_string(sm.sleepQuality) + "\n");
                 s.append("Heart rate: " + to_string(sm.heartRate) + "\n");
                 s.append("Wake up hour: " + to_string(sm.wakeUpHour) + "\n");
+                return s;
             }
 
             return "";
@@ -402,20 +393,18 @@ private:
         void checkData() {
             while (runThread) {
                 this_thread::sleep_for(chrono::seconds(1));
-                cout<<"AAAAAAAAA";
                 time_t tt;
                 time(&tt);
                 tm TM = *localtime(&tt);
                 float currentHour = TM.tm_hour;
-                // if (sm.heartRate != -1 && sm.sleepHours != -1 && sm.sleepQuality != -1 && sm.wakeUpHour != -1) {
-                //     if (sm.sleepHours >= 3 && currentHour - sm.wakeUpHour == 0 && recommendationsMade == false){
-                //         recommendationsMade = true;
-                         makeRecommendations();
-                //     }
-                //     else if (currentHour - sm.wakeUpHour > 0 ){
-                //         recommendationsMade = false;
-                //     }
-                // }
+                if (sm.heartRate != -1 && sm.sleepHours != -1 && sm.sleepQuality != -1 && sm.wakeUpHour != -1) {
+                    if (sm.sleepHours >= 3 && currentHour - sm.wakeUpHour == 0 && recommendationsMade == false) {
+                        recommendationsMade = true;
+                        makeRecommendations();
+                    } else if (currentHour - sm.wakeUpHour > 0) {
+                        recommendationsMade = false;
+                    }
+                }
             }
         }
     };
@@ -431,7 +420,6 @@ private:
 };
 
 int main(int argc, char *argv[]) {
-    // Scale from 1 to 5
     // Coffees available in the coffee maker
 //    weak
     coffees.push_back(Coffee("Latte", 3, 3, 2, 2));
