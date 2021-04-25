@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <chrono>
 #include <thread>
+#include <iostream>
+#include <fstream>
 
 
 using namespace std;
@@ -345,6 +347,9 @@ private:
             return 0;
         }
 
+        ofstream MyOutputFile;
+        
+
         string get(string name) {
             if (name.compare("cancel") == 0) {
                 return to_string(cancelPrep);
@@ -355,9 +360,16 @@ private:
             if (name.compare("history") == 0) {
                 // Show the history for the coffees
                 string s = "";
+                MyOutputFile.open("file.txt");
                 for (auto i: history) {
                     s.append(i.first + ", " + i.second + "\n");
+                    MyOutputFile<<i.first + ", " + i.second + "\n";
+                    
+                    
+                    
                 }
+                MyOutputFile.close();
+               
                 return s;
             }
             if (name.compare("chooseCoffee") == 0) {
@@ -480,4 +492,5 @@ int main(int argc, char *argv[]) {
     }
 
     stats.stop();
+    
 }
