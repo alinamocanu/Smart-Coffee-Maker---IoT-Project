@@ -15,7 +15,7 @@
 #include <thread>
 #include <iostream>
 #include <fstream>
-
+#include <mosquitto.h>
 
 using namespace std;
 using namespace Pistache;
@@ -53,6 +53,7 @@ public:
 
 
 vector<Coffee> coffees;
+struct mosquitto* _mosq = nullptr;
 
 // This is just a helper function to preety-print the Cookies that one of the enpoints shall receive.
 void printCookies(const Http::Request &req) {
@@ -95,6 +96,13 @@ public:
                 .threads(static_cast<int>(thr));
         httpEndpoint->init(opts);
 
+        _mosq = mosquitto_new(nullptr, true, nullptr);
+        if (mosquitto_connect(_mosq, _host.c_str(), _port, _keep_alive) != MOSQ_ERR_SUCCESS) {
+            cerr << "connect error!!" << endl;
+        } else {
+            _connected = true;
+        }
+
         setupRoutes();
     }
 
@@ -117,6 +125,10 @@ public:
 
 private:
     thread *checkLoopThread;
+    string _host = "localhost";
+    int _port = 1883;
+    int _keep_alive = 60;
+    bool _connected = false;
 
     void setupRoutes() {
         using namespace Rest;
@@ -317,10 +329,12 @@ private:
                 cancelPrep = true;
                 return 1;
             }
+
             if (name.compare("showStage") == 0) {
                 showStage = 4;
                 return 1;
             }
+
             if (name.compare("chooseCoffee") == 0) {
                 chooseCoffee = value;
                 showStage = 1;
@@ -334,6 +348,7 @@ private:
                     return verifyIngredientsLevel(value);
                 }
             }
+
             if (name.compare("recommendations") == 0) {
                 vector<string> smartWatchVal = split(value, ',');
                 if (smartWatchVal.size() != 4) {
@@ -354,9 +369,21 @@ private:
             if (name.compare("cancel") == 0) {
                 return to_string(cancelPrep);
             }
+
             if (name.compare("showStage") == 0) {
+                if (mosquitto_publish(_mosq, 
+                            nullptr, 
+                            "mqtt",
+                            static_cast<int>(coffeeStage(getStage()).length()) + 1,
+                            coffeeStage(getStage()).c_str(), 0, 0) != MOSQ_ERR_SUCCESS) {
+
+                    std::cerr<< "MQTT publish error." << std::endl;
+                    return "";
+                }
+                cerr<<"YAAAY";
                 return coffeeStage(getStage());
             }
+
             if (name.compare("history") == 0) {
                 // Show the history for the coffees
                 string s = "";
@@ -364,17 +391,17 @@ private:
                 for (auto i: history) {
                     s.append(i.first + ", " + i.second + "\n");
                     MyOutputFile<<i.first + ", " + i.second + "\n";
-                    
-                    
-                    
                 }
+
                 MyOutputFile.close();
                
                 return s;
             }
+
             if (name.compare("chooseCoffee") == 0) {
                 return chooseCoffee;
             }
+
             if (name.compare("recommendations") == 0) {
                 string s = "";
                 for (auto i: coffeeRecommendations) {
@@ -382,6 +409,7 @@ private:
                 }
                 return s;
             }
+
             if (name.compare("ingredients") == 0) {
                 string s = "";
                 s.append("Coffee level: " + to_string(ingredients.coffeeLvl) + "\n");
@@ -390,6 +418,7 @@ private:
                 s.append("Milk level: " + to_string(ingredients.milkLvl) + "\n");
                 return s;
             }
+
             if (name.compare("smartwatch") == 0) {
                 string s = "";
                 s.append("Number of hours slept " + to_string(sm.sleepHours) + "\n");
@@ -486,11 +515,14 @@ int main(int argc, char *argv[]) {
     int signal = 0;
     int status = sigwait(&signals, &signal);
     if (status == 0) {
+        mosquitto_disconnect(_mosq);
+        mosquitto_lib_cleanup();
+        mosquitto_destroy(_mosq);
+
         std::cout << "received signal " << signal << std::endl;
     } else {
         std::cerr << "sigwait returns " << status << std::endl;
     }
 
     stats.stop();
-    
 }

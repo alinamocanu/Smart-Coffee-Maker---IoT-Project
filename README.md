@@ -24,24 +24,49 @@ sudo apt install g++
 
 ```bash
 
-g++ smartCoffeeMaker.cpp -o coffeeMaker -lpistache -lcrypto -lssl -lpthread
+g++ smartCoffeeMaker.cpp -o coffeeMaker -lpistache -lcrypto -lssl -lpthread -lmosquitto
 
 ```
-To start server:
+
+## Start MQTT process
 
 ```bash
-./coffeeMaker
+
+mosquitto -v
+
 ```
+
+## Start server:
+
+```bash
+
+./coffeeMaker
+
+```
+
+## Subscribe to MQTT topic 
+
+```bash
+
+mosquitto_sub -t mqtt
+
+```
+
 To test, in another terminal type:
 
 ```bash
+
 curl http://localhost:9080/ready
+
 ```
 
 For post methods:
 
 ```bash
-curl -X -POST [URL]
+
+curl -X POST [URL]
+
 ```
 Or you can use a tool like [Postman](https://www.postman.com/)
-Functionalities and analysis report - [Raport de analiza](https://github.com/AlinaMocanu/Smart-Coffee-Maker---IoT-Project/blob/main/Raport%20de%20analiza.docx)
+
+Functionalities and analysis report - [Raport de analiza](https://github.com/AlinaMocanu/Smart-Coffee-Maker---IoT-Project/blob/mainRaport%20de%20analiza.docx)
