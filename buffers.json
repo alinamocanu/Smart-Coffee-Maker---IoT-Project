@@ -96,23 +96,13 @@
         },
 		"2":{
             "token-delimitators": "",
-            "protocol": "FILE",
-            "prefix": "curl -XGET 'http://127.0.0.1:9080/'",
+            "protocol": "FILE-TXT",
             "buffer-tokens":[
             {
-                "name":"Cofee Maker history",
-                "description":"",
-                "token-type":"string", 
+                "name":"historyFile",
+                "description":"File containing the history of prepared coffees",
                 "byte-size":10, 
-                "regex-rule": "[a-zA-Z]*", // Correct inputs will be: [settings]
-                "optional": false
-            },
-            {
-                "name":"Cofee Maker recommendations result",
-                "description": "",
-                "token-type":"string",
-                "byte-size":10,
-                "regex-rule": "[a-zA-Z]*", // Correct inputs will be: [history]
+                "regex-rule": "[a-zA-Z, ]*[0-9: ]*", // Correct outputs will be for example: [Espresso, Sun Apr 25 18:01:39 2021]
                 "optional": false
             }
             ]

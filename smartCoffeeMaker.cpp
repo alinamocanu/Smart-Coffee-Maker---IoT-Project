@@ -387,7 +387,7 @@ private:
             if (name.compare("history") == 0) {
                 // Show the history for the coffees
                 string s = "";
-                MyOutputFile.open("file.txt");
+                MyOutputFile.open("historyFile.txt");
                 for (auto i: history) {
                     s.append(i.first + ", " + i.second + "\n");
                     MyOutputFile<<i.first + ", " + i.second + "\n";
