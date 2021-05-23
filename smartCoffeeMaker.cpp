@@ -1,3 +1,15 @@
+/*  
+    Smart CoffeMaker
+
+    Bajan Ioana
+    Dinu Delia
+    Dobre Beatrice
+    Mocanu Alina
+    
+    using Rares Cristea's example, 12.03.2021
+    using Mathieu Stefani's example, 07 février 2016
+*/
+
 #include <algorithm>
 #include <pistache/net.h>
 #include <pistache/http.h>
@@ -34,6 +46,7 @@ struct Ingredients {
     int milkLvl;
 };
 
+// level of ingredients needed for a specific type of coffee
 class Coffee {
 public:
     int milkNeeded;
@@ -51,11 +64,11 @@ public:
     }
 };
 
-
+// coffees available in coffee maker
 vector<Coffee> coffees;
 struct mosquitto* _mosq = nullptr;
 
-// This is just a helper function to preety-print the Cookies that one of the enpoints shall receive.
+// this is just a helper function to preety-print the Cookies that one of the enpoints shall receive.
 void printCookies(const Http::Request &req) {
     auto cookies = req.cookies();
     cout << "Cookies: [" << std::endl;
@@ -66,6 +79,7 @@ void printCookies(const Http::Request &req) {
     cout << "]" << std::endl;
 }
 
+// helper to test if the server is functional
 namespace Generic {
 
     void handleReady(const Rest::Request &, Http::ResponseWriter response) {
@@ -90,12 +104,13 @@ public:
     explicit CoffeeMakerEndpoint(Address addr)
             : httpEndpoint(std::make_shared<Http::Endpoint>(addr)) {}
 
-    // Initialization of the server. Additional options can be provided here
+    // initialization of the server
     void init(size_t thr = 2) {
         auto opts = Http::Endpoint::options()
                 .threads(static_cast<int>(thr));
         httpEndpoint->init(opts);
 
+        // mosquitto protocol initialization
         _mosq = mosquitto_new(nullptr, true, nullptr);
         if (mosquitto_connect(_mosq, _host.c_str(), _port, _keep_alive) != MOSQ_ERR_SUCCESS) {
             cerr << "connect error!!" << endl;
@@ -106,7 +121,7 @@ public:
         setupRoutes();
     }
 
-    // Server is started threaded.
+    // server is started threaded with additional thread
     void start() {
         httpEndpoint->setHandler(router.handler());
         httpEndpoint->serveThreaded();
@@ -114,7 +129,7 @@ public:
         checkLoopThread = new thread(&CoffeeMaker::checkData, ref(cmk));
     }
 
-    // When signaled server shuts down
+    // when signaled server shuts down
     void stop() {
         httpEndpoint->shutdown();
 
@@ -130,6 +145,7 @@ private:
     int _keep_alive = 60;
     bool _connected = false;
 
+    // http routes available 
     void setupRoutes() {
         using namespace Rest;
         Routes::Get(router, "/ready", Routes::bind(&Generic::handleReady));
@@ -139,15 +155,16 @@ private:
     }
 
     void doAuth(const Rest::Request &request, Http::ResponseWriter response) {
-        // Function that prints cookies
+        // function that prints cookies
         printCookies(request);
-        // In the response object, it adds a cookie regarding the communications language.
+        // in the response object, it adds a cookie regarding the communications language.
         response.cookies()
                 .add(Http::Cookie("lang", "en-US"));
-        // Send the response
+        // send the response
         response.send(Http::Code::Ok);
     }
 
+    // set functionalities
     void setSetting(const Rest::Request &request, Http::ResponseWriter response) {
         auto settingName = request.param(":settingName").as<std::string>();
 
@@ -161,10 +178,10 @@ private:
 
         int setResponse = cmk.set(settingName, val);
 
-        // Send notifications if there aren't enough ingredients
+        // send notifications if there aren't enough ingredients
         if (settingName.compare("chooseCoffee") == 0) {
             if (setResponse == 1) {
-                response.send(Http::Code::Ok, "Coffee is preparing" + "\nStage:" + cmk.coffeeStage(cmk.getStage()));
+                response.send(Http::Code::Ok, "Coffee is preparing \n Stage: " + cmk.coffeeStage(cmk.getStage()));
             } else if (setResponse == -1) {
                 response.send(Http::Code::Not_Found, "There isn't enough coffee");
             } else if (setResponse == -2) {
@@ -174,11 +191,12 @@ private:
             } else if (setResponse == -4) {
                 response.send(Http::Code::Not_Found, "There isn't enough water");
             }
+        // cancel coffee preparation
         } else if (settingName.compare("cancel") == 0) {
             if (setResponse == 1) {
-                response.send(Http::Code::Ok, "Cancel Preparation" + "\nStage:" + cmk.coffeeStage(cmk.getStage()) );
+                response.send(Http::Code::Ok, "Cancel Preparation \n Stage: " + cmk.coffeeStage(cmk.getStage()));
             }
-
+        // show the current stage of the coffee maker
         } else if (settingName.compare("showStage") == 0) {
             if (setResponse == 1) {
                 response.send(Http::Code::Ok, "Stage : " + cmk.coffeeStage(cmk.getStage()));
@@ -197,6 +215,7 @@ private:
         }
     }
 
+    // get functionalities
     void getSetting(const Rest::Request &request, Http::ResponseWriter response) {
         auto settingName = request.param(":settingName").as<std::string>();
 
@@ -220,11 +239,11 @@ private:
     private:
         bool cancelPrep;
         int showStage;
-        SmartWatch sm;
-        vector<string> coffeeRecommendations;
-        Ingredients ingredients;
-        vector<pair<string, string>> history;
         string chooseCoffee;
+        SmartWatch sm;
+        Ingredients ingredients;
+        vector<string> coffeeRecommendations;
+        vector<pair<string, string>> history;
     public:
         bool runThread = true;
         bool recommendationsMade = false;
@@ -234,18 +253,20 @@ private:
             showStage = 0;
             chooseCoffee = "none";
 
-            //Initial ingredients level from the coffee maker
+            // initial ingredients level from the coffee maker
             ingredients.coffeeLvl = 10;
             ingredients.milkLvl = 10;
             ingredients.sugarLvl = 10;
             ingredients.waterLvl = 10;
 
+            // initial values from the SmartWatch
             sm.heartRate = -1;
             sm.sleepHours = -1;
             sm.sleepQuality = -1;
             sm.wakeUpHour = -1;
         };
 
+        // available stages for the coffee maker
         static string coffeeStage(int p) {
             switch (p) {
                 case 0:
@@ -265,7 +286,7 @@ private:
             return showStage;
         }
 
-        // Verify the level of ingredients and substract the necessary ingredients for the coffee
+        // verify the level of ingredients and substract the necessary ingredients for the coffee
         int verifyIngredientsLevel(string coffeeName) {
             for (auto c : coffees) {
                 if (c.name.compare(coffeeName) == 0) {
@@ -289,6 +310,7 @@ private:
             return 0;
         }
 
+        // modify SmartWatch values from the request
         void modifySMData(vector<string> smartWatchVal) {
             sm.sleepHours = stoi(smartWatchVal[0]);
             sm.sleepQuality = stoi(smartWatchVal[1]);
@@ -296,6 +318,7 @@ private:
             sm.wakeUpHour = stoi(smartWatchVal[3]);
         }
 
+        // calculate coffee recommendations
         void makeRecommendations() {
             double score;
             coffeeRecommendations.clear();
@@ -337,12 +360,13 @@ private:
                 chooseCoffee = value;
                 showStage = 1;
                 time_t now = time(0);
-                // If there are enough ingredients, we prepare the coffee and append it to history
+                // if there are enough ingredients, we prepare the coffee and append it to history
                 if (verifyIngredientsLevel(value) == 1) {
                     history.push_back(make_pair(value, ctime(&now)));
                     showStage = 2;
                     return 1;
                 } else {
+                    // notification for lack of ingredients
                     return verifyIngredientsLevel(value);
                 }
             }
@@ -368,6 +392,7 @@ private:
                 return to_string(cancelPrep);
             }
 
+            // publish stage of the coffee maker on mqtt
             if (name.compare("showStage") == 0) {
                 if (mosquitto_publish(_mosq, 
                             nullptr, 
@@ -383,7 +408,7 @@ private:
             }
 
             if (name.compare("history") == 0) {
-                // Show the history for the coffees
+                // show the history for the coffees and write it on the output file
                 string s = "";
                 MyOutputFile.open("historyFile.txt");
                 for (auto i: history) {
@@ -429,6 +454,7 @@ private:
             return "";
         }
 
+        // thread to verify every 10 seconds if the user just woke up to make coffee recommendations
         void checkData() {
             while (runThread) {
                 this_thread::sleep_for(chrono::seconds(10));
@@ -436,6 +462,7 @@ private:
                 time(&tt);
                 tm TM = *localtime(&tt);
                 float currentHour = TM.tm_hour;
+                cerr<<"Local time:"<<currentHour;
                 if (sm.heartRate != -1 && sm.sleepHours != -1 && sm.sleepQuality != -1 && sm.wakeUpHour != -1) {
                     if (sm.sleepHours >= 3 && currentHour - sm.wakeUpHour == 0 && recommendationsMade == false) {
                         recommendationsMade = true;
@@ -459,21 +486,21 @@ private:
 };
 
 int main(int argc, char *argv[]) {
-    // Coffees available in the coffee maker
-//    weak
+    // coffees available in the coffee maker
+    // weak
     coffees.push_back(Coffee("Latte", 3, 3, 2, 2));
     coffees.push_back(Coffee("Cappuccino", 3, 2, 1, 0));
     coffees.push_back(Coffee("Moccaccino", 3, 3, 2, 2));
-//    medium
+    // medium
     coffees.push_back(Coffee("Machiatto", 3, 3, 2, 2));
     coffees.push_back(Coffee("FlatWhite", 3, 1, 1, 1));
     coffees.push_back(Coffee("Curtado", 3, 1, 1, 1));
-    //strong
+    // strong
     coffees.push_back(Coffee("Espresso", 3, 0, 1, 0));
     coffees.push_back(Coffee("Americano", 3, 0, 3, 1));
     coffees.push_back(Coffee("Turkish", 3, 0, 3, 1));
 
-    // This code is needed for gracefull shutdown of the server when no longer needed.
+    // this code is needed for gracefull shutdown of the server when no longer needed.
     sigset_t signals;
     if (sigemptyset(&signals) != 0
         || sigaddset(&signals, SIGTERM) != 0
@@ -484,10 +511,10 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Set a port on which your server to communicate
+    // set a port on which your server to communicate
     Port port(9080);
 
-    // Number of threads used by the server
+    // number of threads used by the server
     int thr = 2;
 
     if (argc >= 2) {
@@ -502,14 +529,14 @@ int main(int argc, char *argv[]) {
     cout << "Cores = " << hardware_concurrency() << endl;
     cout << "Using " << thr << " threads" << endl;
 
-    // Instance of the class that defines what the server can do.
+    // instance of the class that defines what the server can do.
     CoffeeMakerEndpoint stats(addr);
 
-    // Initialize and start the server
+    // initialize and start the server
     stats.init(thr);
     stats.start();
 
-    // Code that waits for the shutdown sinal for the server
+    // code that waits for the shutdown sinal for the server
     int signal = 0;
     int status = sigwait(&signals, &signal);
     if (status == 0) {
