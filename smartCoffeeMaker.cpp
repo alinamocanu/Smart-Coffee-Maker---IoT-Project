@@ -164,7 +164,7 @@ private:
         // Send notifications if there aren't enough ingredients
         if (settingName.compare("chooseCoffee") == 0) {
             if (setResponse == 1) {
-                response.send(Http::Code::Ok, "Coffee is preparing");
+                response.send(Http::Code::Ok, "Coffee is preparing" + "\nStage:" + cmk.coffeeStage(cmk.getStage()));
             } else if (setResponse == -1) {
                 response.send(Http::Code::Not_Found, "There isn't enough coffee");
             } else if (setResponse == -2) {
@@ -176,7 +176,7 @@ private:
             }
         } else if (settingName.compare("cancel") == 0) {
             if (setResponse == 1) {
-                response.send(Http::Code::Ok, "Cancel Preparation");
+                response.send(Http::Code::Ok, "Cancel Preparation" + "\nStage:" + cmk.coffeeStage(cmk.getStage()) );
             }
 
         } else if (settingName.compare("showStage") == 0) {
@@ -251,12 +251,10 @@ private:
                 case 0:
                     return "Idle";
                 case 1:
-                    return "Preparing Your Ingredients";
-                case 2:
                     return "Your coffee is in the making!";
-                case 3:
+                case 2:
                     return "Your coffee is ready";
-                case 4:
+                case 3:
                     return "Coffee canceled";
                 default:
                     return "Oopsie! Unkown stage :(";
@@ -327,11 +325,11 @@ private:
         int set(string name, string value) {
             if (name.compare("cancel") == 0) {
                 cancelPrep = true;
+                showStage = 3;
                 return 1;
             }
 
             if (name.compare("showStage") == 0) {
-                showStage = 4;
                 return 1;
             }
 
@@ -354,7 +352,7 @@ private:
                 if (smartWatchVal.size() != 4) {
                     return 0;
                 }
-                //makeRecommendations(smartWatchVal);
+                
                 modifySMData(smartWatchVal);
                 return 1;
             }
@@ -380,7 +378,7 @@ private:
                     std::cerr<< "MQTT publish error." << std::endl;
                     return "";
                 }
-                cerr<<"YAAAY";
+               
                 return coffeeStage(getStage());
             }
 
@@ -433,7 +431,7 @@ private:
 
         void checkData() {
             while (runThread) {
-                this_thread::sleep_for(chrono::seconds(1));
+                this_thread::sleep_for(chrono::seconds(10));
                 time_t tt;
                 time(&tt);
                 tm TM = *localtime(&tt);
